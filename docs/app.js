@@ -38,6 +38,7 @@ const el = (tag, attrs = {}, ...children) => {
   for (const c of children) if (c != null) e.append(c);
   return e;
 };
+const fmtRadius = (m) => (m >= 1000 ? `${+(m / 1000).toFixed(2)}km` : `${m}m`);
 const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const findEvent = (id) => data.events.find((e) => e.id === id);
 
@@ -69,7 +70,7 @@ function popupContent(ev, sp) {
   const done = isCleared(sp);
   const box = el('div', {},
     el('div', { class: 'popup-title' }, sp.name),
-    el('div', { class: 'popup-sub' }, `${ev.name} ／ 半径 ${sp.radius}m`),
+    el('div', { class: 'popup-sub' }, `${ev.name} ／ 半径 ${fmtRadius(sp.radius)}`),
     el('button', {
       class: 'btn popup-btn' + (done ? ' cleared' : ''),
       onclick: () => { toggleCleared(sp.id); map.closePopup(); },
@@ -162,7 +163,7 @@ function renderSidebar() {
 
     if (open) {
       card.append(el('div', { class: 'event-meta' },
-        `デフォルト半径 ${ev.defaultRadius}m`,
+        `デフォルト半径 ${fmtRadius(ev.defaultRadius)}`,
         editMode ? el('button', { class: 'btn small', onclick: () => openSpotEditor(ev.id) }, '＋ スポット追加') : null,
         editMode ? el('button', { class: 'btn small', onclick: () => openEventDialog(ev.id) }, '編集') : null,
         editMode ? el('button', { class: 'btn small danger', onclick: () => deleteEvent(ev.id) }, '削除') : null,
@@ -172,7 +173,7 @@ function renderSidebar() {
         const c = isCleared(sp);
         ul.append(el('li', { class: c ? 'cleared' : '' },
           el('span', { class: 'spot-name', onclick: () => focusSpot(ev, sp) }, sp.name),
-          el('span', { class: 'spot-r' }, `${sp.radius}m`),
+          el('span', { class: 'spot-r' }, fmtRadius(sp.radius)),
           el('label', { class: 'clear-chk', title: '攻略済' },
             el('input', { type: 'checkbox', checked: c, onchange: () => toggleCleared(sp.id) }), '攻略済'),
           editMode ? el('button', { class: 'btn small', title: '編集', onclick: () => openSpotEditor(ev.id, sp.id) }, '✎') : null,
@@ -316,7 +317,7 @@ function openSpotEditor(eventId, spotId = null) {
   $('spot-panel-title').textContent = sp ? 'スポット編集' : 'スポット追加';
   $('spot-panel-event').textContent = ev.name;
   $('spot-name').value = sp ? sp.name : '';
-  $('spot-radius').value = sp ? sp.radius : ev.defaultRadius;
+  setRadiusUI(sp ? sp.radius : ev.defaultRadius);
   $('search-q').value = '';
   $('search-results').replaceChildren();
   $('spot-panel').hidden = false;
@@ -368,6 +369,30 @@ map.on('click', (e) => {
   setSpotLocation(e.latlng.lat, e.latlng.lng);
 });
 $('spot-radius').addEventListener('input', updateTemp);
+
+// 半径の選択（プリセット or カスタム）。実際の値は常に #spot-radius に入れる
+const RADIUS_PRESETS = [50, 200, 1000, 5000, 10000];
+
+function setRadiusUI(r) {
+  const preset = RADIUS_PRESETS.includes(Number(r)) ? String(r) : 'custom';
+  for (const rb of document.querySelectorAll('input[name=radius-preset]')) rb.checked = rb.value === preset;
+  $('spot-radius').value = r;
+  $('radius-custom').hidden = preset !== 'custom';
+}
+
+for (const rb of document.querySelectorAll('input[name=radius-preset]')) {
+  rb.addEventListener('change', () => {
+    if (rb.value === 'custom') {
+      $('radius-custom').hidden = false;
+      $('spot-radius').focus();
+      $('spot-radius').select();
+    } else {
+      $('radius-custom').hidden = true;
+      $('spot-radius').value = rb.value;
+    }
+    updateTemp();
+  });
+}
 $('spot-cancel').addEventListener('click', closeSpotEditor);
 $('spot-cancel-x').addEventListener('click', closeSpotEditor);
 

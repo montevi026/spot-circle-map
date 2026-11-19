@@ -67,7 +67,20 @@
       <p class="muted small">検索結果を選ぶか、地図をクリックして場所を指定（マーカーはドラッグで微調整可）</p>
       <form id="spot-form">
         <label>名称<input type="text" id="spot-name" required></label>
-        <label>半径 (m)<input type="number" id="spot-radius" min="1" step="1" required></label>
+        <fieldset class="radius-field">
+          <legend>半径</legend>
+          <div id="radius-presets" class="chips">
+            <label><input type="radio" name="radius-preset" value="50"><span>50m</span></label>
+            <label><input type="radio" name="radius-preset" value="200"><span>200m</span></label>
+            <label><input type="radio" name="radius-preset" value="1000"><span>1km</span></label>
+            <label><input type="radio" name="radius-preset" value="5000"><span>5km</span></label>
+            <label><input type="radio" name="radius-preset" value="10000"><span>10km</span></label>
+            <label><input type="radio" name="radius-preset" value="custom"><span>カスタム</span></label>
+          </div>
+          <div id="radius-custom" class="custom-row" hidden>
+            <input type="number" id="spot-radius" min="1" step="1" required> m
+          </div>
+        </fieldset>
         <p class="small">座標: <span id="spot-coord">未指定</span></p>
         <div class="row-end">
           <button type="button" id="spot-cancel" class="btn">キャンセル</button>
