@@ -429,30 +429,48 @@ async function resolveShortUrl(url) {
   return j.url;
 }
 
+// 種別の判定（駅 / バス停 / 地名 など）
+// stop（停車位置）や subway_entrance（出入口）はホーム番号などの名前が付くので駅扱いしない
+const STATION_VALUES = new Set(['station', 'halt', 'tram_stop']);
+function kindOf(key, value) {
+  if ((key === 'railway' && STATION_VALUES.has(value)) || (key === 'public_transport' && value === 'station')
+      || (key === 'building' && value === 'train_station')) return '駅';
+  if (key === 'highway' && value === 'bus_stop') return 'バス停';
+  if (key === 'place' || key === 'boundary') return '地名';
+  return null;
+}
+// OSM は駅を「東城」のように「駅」なしで登録しているので、駅のときは「駅」を補う
+const stationName = (name, kind) => (kind === '駅' && !/駅$/.test(name) ? name + '駅' : name);
+
 async function searchNominatim(q) {
   const b = map.getBounds();
   const params = new URLSearchParams({
-    q, format: 'jsonv2', limit: '10', 'accept-language': 'ja',
+    q, format: 'jsonv2', limit: '20', 'accept-language': 'ja', countrycodes: 'jp',
     viewbox: [b.getWest(), b.getNorth(), b.getEast(), b.getSouth()].join(','),
   });
   const res = await fetch('https://nominatim.openstreetmap.org/search?' + params);
   if (!res.ok) throw new Error('Nominatim ' + res.status);
-  return (await res.json()).map((r) => ({
-    src: 'OSM', lat: Number(r.lat), lng: Number(r.lon),
-    name: r.name || r.display_name.split(',')[0], detail: r.display_name,
-  }));
+  return (await res.json()).map((r) => {
+    const kind = kindOf(r.category, r.type);
+    return {
+      src: 'OSM', kind, lat: Number(r.lat), lng: Number(r.lon),
+      name: stationName(r.name || r.display_name.split(',')[0], kind), detail: r.display_name,
+    };
+  });
 }
 
 async function searchPhoton(q) {
   const c = map.getCenter();
-  const params = new URLSearchParams({ q, limit: '10', lat: c.lat, lon: c.lng });
+  // bbox で日本周辺に限定、lat/lon で表示中の地図の近くを優先
+  const params = new URLSearchParams({ q, limit: '20', lat: c.lat, lon: c.lng, bbox: '122,20,154,46' });
   const res = await fetch('https://photon.komoot.io/api/?' + params);
   if (!res.ok) throw new Error('Photon ' + res.status);
   return (await res.json()).features.map((f) => {
     const p = f.properties;
+    const kind = kindOf(p.osm_key, p.osm_value);
     return {
-      src: 'Photon', lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0],
-      name: p.name || p.street || '(名称なし)',
+      src: 'Photon', kind, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0],
+      name: stationName(p.name || p.street || '(名称なし)', kind),
       detail: [p.state, p.county, p.city, p.district, p.street, p.housenumber].filter(Boolean).join(' '),
     };
   });
@@ -461,11 +479,53 @@ async function searchPhoton(q) {
 async function searchGsi(q) {
   const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(q));
   if (!res.ok) throw new Error('国土地理院 ' + res.status);
-  return (await res.json()).map((r) => ({
-    src: '地理院', lat: r.geometry.coordinates[1], lng: r.geometry.coordinates[0],
-    name: r.properties.title, detail: r.properties.title,
-  }));
+  return (await res.json()).map((r) => {
+    const t = r.properties.title;
+    return {
+      src: '地理院', kind: /駅$/.test(t) ? '駅' : '地名',
+      lat: r.geometry.coordinates[1], lng: r.geometry.coordinates[0], name: t, detail: t,
+    };
+  });
 }
+
+// ---------- 検索結果の並べ替え ----------
+// 名前の一致度で点数を付ける。「駅」の有無・全角半角・空白の違いは無視して比較する
+const norm = (s) => s.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+const baseName = (s) => norm(s).replace(/駅$/, '');
+
+function scoreResult(r, q) {
+  const qb = baseName(q), nb = baseName(r.name);
+  const wantsStation = /駅$/.test(q.trim());
+  let s;
+  if (nb === qb) s = 100;                 // 完全一致
+  else if (nb.startsWith(qb)) s = 60;     // 前方一致
+  else if (nb.endsWith(qb)) s = 50;       // 後方一致（例: 備後庄原 ← 庄原）
+  else if (nb.includes(qb)) s = 30;       // 部分一致（例: 広島県庄原市）
+  else s = 0;                             // 表記ゆれなど
+  if (r.kind === '駅') s += wantsStation ? 40 : 10;
+  if (r.kind === 'バス停' && wantsStation) s -= 40;
+  return s;
+}
+
+function rankResults(results, q) {
+  const c = map.getCenter();
+  for (const r of results) {
+    r.score = scoreResult(r, q);
+    r.dist = map.distance(c, [r.lat, r.lng]);
+  }
+  // 点数が高い順、同点なら今見ている地図の中心に近い順
+  results.sort((a, b) => b.score - a.score || a.dist - b.dist);
+  const out = [];
+  for (const r of results) {
+    // 同じ名前で近いもの（駅は路線・データ元ごとに位置がずれるので 1km、それ以外は 50m）は重複として除外
+    const dup = out.some((m) => baseName(m.name) === baseName(r.name)
+      && map.distance([m.lat, m.lng], [r.lat, r.lng]) < (r.kind === '駅' || m.kind === '駅' ? 1000 : 50));
+    if (!dup) out.push(r);
+  }
+  return out.slice(0, 30);
+}
+
+const fmtDist = (m) => (m >= 1000 ? `${Math.round(m / 1000)}km` : `${Math.round(m)}m`);
 
 function showResults(results, emptyMsg) {
   const ul = $('search-results');
@@ -480,7 +540,12 @@ function showResults(results, emptyMsg) {
         setSpotLocation(r.lat, r.lng);
         map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16));
       },
-    }, el('b', {}, r.name, el('span', { class: 'src' }, r.src)), r.detail);
+    },
+    el('b', {}, r.name,
+      r.kind ? el('span', { class: 'kind' + (r.kind === '駅' ? ' station' : '') }, r.kind) : null,
+      el('span', { class: 'src' }, r.src)),
+    r.detail,
+    el('span', { class: 'dist' }, `（地図の中心から ${fmtDist(r.dist)}）`));
     ul.append(li);
   }
 }
@@ -519,20 +584,12 @@ $('search-form').addEventListener('submit', async (e) => {
     return;
   }
 
-  // 名称検索（3 サービスを並列に）
+  // 名称検索（3 サービスを並列に）→ 一致度順に並べ替え
   ul.replaceChildren(el('li', { class: 'muted' }, '検索中…'));
   const settled = await Promise.allSettled([searchGsi(q), searchNominatim(q), searchPhoton(q)]);
-  const merged = [];
-  for (const s of settled) {
-    if (s.status !== 'fulfilled') continue;
-    for (const r of s.value) {
-      // 同名で 50m 以内のものは重複として除外
-      const dup = merged.some((m) => m.name === r.name && map.distance([m.lat, m.lng], [r.lat, r.lng]) < 50);
-      if (!dup) merged.push(r);
-    }
-  }
+  const all = settled.filter((s) => s.status === 'fulfilled').flatMap((s) => s.value);
   const failed = settled.filter((s) => s.status === 'rejected').map((s) => s.reason.message);
-  showResults(merged, '見つかりませんでした。Google マップで地点を右クリック → 座標をコピーして貼り付けるか、地図をクリックして指定してください');
+  showResults(rankResults(all, q), '見つかりませんでした。Google マップで地点を右クリック → 座標をコピーして貼り付けるか、地図をクリックして指定してください');
   if (failed.length) ul.append(el('li', { class: 'muted' }, '一部の検索に失敗: ' + failed.join(', ')));
 });
 
