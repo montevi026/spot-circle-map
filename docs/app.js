@@ -6,6 +6,7 @@ const LS = {
   cleared: 'scm.cleared.v1',       // { spotId: true }   攻略済スポット
   options: 'scm.options.v1',       // 表示オプション
   expanded: 'scm.expanded.v1',     // サイドバーで展開中のイベント
+  order: 'scm.order.v1',           // イベントの並び順（イベント ID の配列）
   view: 'scm.view.v1',             // 最後の地図位置
 };
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
@@ -15,6 +16,16 @@ const visibility = load(LS.visibility, {});
 const cleared = load(LS.cleared, {});
 const options = Object.assign({ labels: false, hideCleared: false }, load(LS.options, {}));
 const expanded = load(LS.expanded, {});
+let eventOrder = load(LS.order, []);
+
+// ブラウザに記憶した並び順でイベントを返す。記憶に無い（新しく追加された）イベントは元の順で後ろに付ける
+function orderedEvents() {
+  const pos = new Map(eventOrder.map((id, i) => [id, i]));
+  return data.events
+    .map((ev, i) => ({ ev, k: pos.has(ev.id) ? pos.get(ev.id) : eventOrder.length + i }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.ev);
+}
 
 const isVisible = (ev) => visibility[ev.id] !== false;
 const isCleared = (sp) => !!cleared[sp.id];
@@ -140,12 +151,13 @@ function renderSidebar() {
   list.replaceChildren();
   $('empty-msg').hidden = data.events.length > 0;
 
-  for (const ev of data.events) {
+  for (const ev of orderedEvents()) {
     const vis = isVisible(ev);
     const done = ev.spots.filter(isCleared).length;
     const open = !!expanded[ev.id];
 
     const head = el('div', { class: 'event-head' },
+      el('span', { class: 'drag-handle', title: 'ドラッグして並べ替え', onpointerdown: startEventDrag }, '⋮⋮'),
       el('input', {
         type: 'checkbox', checked: vis, title: '地図に表示',
         onchange: (e) => { visibility[ev.id] = e.target.checked; store(LS.visibility, visibility); refresh(); },
@@ -159,7 +171,7 @@ function renderSidebar() {
       }, open ? '▲' : '▼'),
     );
 
-    const card = el('div', { class: 'event-card' + (vis ? '' : ' off') }, head);
+    const card = el('div', { class: 'event-card' + (vis ? '' : ' off'), 'data-id': ev.id }, head);
 
     if (open) {
       card.append(el('div', { class: 'event-meta' },
@@ -185,6 +197,51 @@ function renderSidebar() {
     }
     list.append(card);
   }
+}
+
+// ---------- イベントの並べ替え（ドラッグ＆ドロップ） ----------
+// マウスでもスマホのタッチでも動くよう、Pointer Events で実装している
+function startEventDrag(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const card = handle.closest('.event-card');
+  const list = $('event-list');
+  const scroller = $('sidebar');
+  const before = [...list.children].map((c) => c.dataset.id).join();
+  try { handle.setPointerCapture(e.pointerId); } catch { /* 合成イベントなど */ }
+  card.classList.add('dragging');
+  document.body.classList.add('dragging-event');
+
+  const onMove = (ev) => {
+    // ポインターの位置より下にある最初のカードの手前へ移動
+    const others = [...list.querySelectorAll('.event-card:not(.dragging)')];
+    const next = others.find((c) => {
+      const r = c.getBoundingClientRect();
+      return ev.clientY < r.top + r.height / 2;
+    });
+    if (next) { if (card.nextElementSibling !== next) list.insertBefore(card, next); }
+    else if (list.lastElementChild !== card) list.append(card);
+    // サイドバーの上端・下端に近づいたら自動スクロール
+    const sr = scroller.getBoundingClientRect();
+    if (ev.clientY < sr.top + 40) scroller.scrollTop -= 12;
+    else if (ev.clientY > sr.bottom - 40) scroller.scrollTop += 12;
+  };
+  const onEnd = () => {
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', onEnd);
+    handle.removeEventListener('pointercancel', onEnd);
+    card.classList.remove('dragging');
+    document.body.classList.remove('dragging-event');
+    const ids = [...list.children].map((c) => c.dataset.id).filter(Boolean);
+    if (ids.join() !== before) {
+      eventOrder = ids;
+      store(LS.order, eventOrder);
+    }
+  };
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onEnd);
+  handle.addEventListener('pointercancel', onEnd);
 }
 
 function refresh() {
