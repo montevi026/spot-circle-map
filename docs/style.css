@@ -95,6 +95,8 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .popup-btn { width: 100%; }
 .popup-btn.cleared { background: #2e7d32; border-color: #2e7d32; color: #fff; }
 
+#install-box { background: #e3f2fd; }
+#install-box p { margin: 0; }
 #publish-box { background: #fff8e1; }
 #publish-state.pending { color: #e65100; font-weight: bold; }
 #publish-link { display: inline-block; margin-top: 4px; }

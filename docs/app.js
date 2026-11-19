@@ -790,6 +790,43 @@ document.addEventListener('visibilitychange', () => {
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
+// ---------- アプリとしてインストール ----------
+// Android / PC の Chrome・Edge: ブラウザがインストール可能と判断したらボタンを出す
+// iPhone / iPad の Safari: 自動インストールの仕組みが無いので「ホーム画面に追加」の手順を出す
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let installPrompt = null;
+
+function updateInstallBox() {
+  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const showBtn = !!installPrompt;
+  const showIos = isIos && !installPrompt;
+  $('btn-install').hidden = !showBtn;
+  $('ios-install').hidden = !showIos;
+  // インストール済み（アプリとして起動中）や編集モードでは出さない
+  $('install-box').hidden = editMode || isStandalone() || !(showBtn || showIos);
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  updateInstallBox();
+});
+
+$('btn-install').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => null);
+  installPrompt = null;
+  updateInstallBox();
+});
+
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  updateInstallBox();
+  toast('インストールしました。ホーム画面（アプリ一覧）から起動できます');
+});
+
 // ---------- 起動 ----------
 async function init() {
   // ローカルサーバー（server.py）経由なら編集モード。?view を付けると閲覧モードで確認できる
@@ -821,6 +858,7 @@ async function init() {
 
   refresh();
 
+  updateInstallBox();
   $('opt-proximity').checked = !!options.proximity;
   if (options.proximity) startProximity();
 }
