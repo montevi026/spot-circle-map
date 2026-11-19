@@ -26,6 +26,55 @@
           "radius": 200,
           "lat": 34.9395208,
           "lng": 133.1176499
+        },
+        {
+          "id": "smwnddahisj5i",
+          "name": "高駅",
+          "radius": 50,
+          "lat": 34.8778813,
+          "lng": 133.0706189
+        },
+        {
+          "id": "smwnddo5si8le",
+          "name": "備後西城駅",
+          "radius": 50,
+          "lat": 34.9400446,
+          "lng": 133.1197888
+        },
+        {
+          "id": "smwnddybmozt4",
+          "name": "比婆山駅",
+          "radius": 50,
+          "lat": 34.9659636,
+          "lng": 133.1232051
+        },
+        {
+          "id": "smwnde7q59egi",
+          "name": "備後落合駅",
+          "radius": 50,
+          "lat": 35.0010589,
+          "lng": 133.1483849
+        },
+        {
+          "id": "smwndehyorsso",
+          "name": "東城駅",
+          "radius": 50,
+          "lat": 34.9019593,
+          "lng": 133.27382
+        },
+        {
+          "id": "smwndexy3uyi6",
+          "name": "東城まちなか交流施設 えびす",
+          "radius": 200,
+          "lat": 34.8983174,
+          "lng": 133.2723004
+        },
+        {
+          "id": "smwndfm3voxdh",
+          "name": "備後庄原駅",
+          "radius": 50,
+          "lat": 34.8623415,
+          "lng": 133.0164313
         }
       ]
     },
@@ -125,6 +174,197 @@
           "radius": 50,
           "lat": 36.1897199,
           "lng": 137.8218388
+        }
+      ]
+    },
+    {
+      "id": "emwndgmgfit6g",
+      "name": "駅メモ熊本2026",
+      "defaultRadius": 50,
+      "color": "#d84141",
+      "spots": [
+        {
+          "id": "smwndgxny0oe8",
+          "name": "熊本駅",
+          "radius": 50,
+          "lat": 32.7904121,
+          "lng": 130.6886217
+        },
+        {
+          "id": "smwndh41ba0dj",
+          "name": "宇土駅",
+          "radius": 50,
+          "lat": 32.6938784,
+          "lng": 130.6690231
+        },
+        {
+          "id": "smwndhata9gap",
+          "name": "新八代駅",
+          "radius": 50,
+          "lat": 32.5189024,
+          "lng": 130.6349613
+        },
+        {
+          "id": "smwndhhq1lrh6",
+          "name": "三角駅",
+          "radius": 50,
+          "lat": 32.6079119,
+          "lng": 130.4699476
+        },
+        {
+          "id": "smwndhqtbmizd",
+          "name": "水前寺駅",
+          "radius": 50,
+          "lat": 32.7970094,
+          "lng": 130.7298875
+        },
+        {
+          "id": "smwndhxoetckb",
+          "name": "肥後大津駅",
+          "radius": 50,
+          "lat": 32.8772927,
+          "lng": 130.8659998
+        },
+        {
+          "id": "smwndi7dkscw9",
+          "name": "立野駅",
+          "radius": 50,
+          "lat": 32.8774332,
+          "lng": 130.965365
+        },
+        {
+          "id": "smwndic4liv4d",
+          "name": "阿蘇駅",
+          "radius": 50,
+          "lat": 32.9374013,
+          "lng": 131.0800572
+        },
+        {
+          "id": "smwndimbhksbw",
+          "name": "上熊本駅",
+          "radius": 50,
+          "lat": 32.8185778,
+          "lng": 130.6998183
+        },
+        {
+          "id": "smwndj25old44",
+          "name": "玉名駅",
+          "radius": 50,
+          "lat": 32.9262387,
+          "lng": 130.5493345
+        }
+      ]
+    },
+    {
+      "id": "emwndp0mwgkus",
+      "name": "国盗りスタンプラリー2024",
+      "defaultRadius": 10000,
+      "color": "#f58231",
+      "spots": [
+        {
+          "id": "smwndpir6m2d6",
+          "name": "カムイワッカ湯の滝",
+          "radius": 5000,
+          "lat": 44.1538556,
+          "lng": 145.1292767
+        },
+        {
+          "id": "smwndpom8lmqt",
+          "name": "緑駅",
+          "radius": 5000,
+          "lat": 43.7183388,
+          "lng": 144.5055029
+        },
+        {
+          "id": "smwndq59l4xco",
+          "name": "ひがしもこと芝桜公園",
+          "radius": 5000,
+          "lat": 43.7828861,
+          "lng": 144.3122737
+        },
+        {
+          "id": "smwndqghy8t58",
+          "name": "北見駅",
+          "radius": 5000,
+          "lat": 43.804997,
+          "lng": 143.8979114
+        },
+        {
+          "id": "smwndqrap9oas",
+          "name": "田沢湖",
+          "radius": 5000,
+          "lat": 39.7248371,
+          "lng": 140.6632728
+        },
+        {
+          "id": "smwndqyb0bxyh",
+          "name": "青海川駅",
+          "radius": 5000,
+          "lat": 37.3483949,
+          "lng": 138.4861718
+        },
+        {
+          "id": "smwndrb0i5se6",
+          "name": "境港駅",
+          "radius": 5000,
+          "lat": 35.5448868,
+          "lng": 133.2228921
+        },
+        {
+          "id": "smwndrh5j9mah",
+          "name": "七軒茶屋駅",
+          "radius": 5000,
+          "lat": 34.4719961,
+          "lng": 132.4805594
+        },
+        {
+          "id": "smwndrnshmdkb",
+          "name": "益田駅",
+          "radius": 5000,
+          "lat": 34.6780548,
+          "lng": 131.8392003
+        },
+        {
+          "id": "smwndrz85zzbd",
+          "name": "青海島",
+          "radius": 5000,
+          "lat": 34.4180085,
+          "lng": 131.1936226
+        },
+        {
+          "id": "smwndsdwp3yw1",
+          "name": "浜野浦の棚田展望台",
+          "radius": 5000,
+          "lat": 33.4892254,
+          "lng": 129.8473687
+        },
+        {
+          "id": "smwndsvyotfs6",
+          "name": "北大東島",
+          "radius": 5000,
+          "lat": 25.944514,
+          "lng": 131.3075668
+        },
+        {
+          "id": "smwndt5sn48av",
+          "name": "沖縄美ら海水族館",
+          "radius": 5000,
+          "lat": 26.6945554,
+          "lng": 127.8781141
+        },
+        {
+          "id": "smwndu0y35j2e",
+          "name": "北谷公園",
+          "radius": 5000,
+          "lat": 26.3118231,
+          "lng": 127.7566153
+        },
+        {
+          "id": "smwnduaqlxuua",
+          "name": "赤嶺駅",
+          "radius": 5000,
+          "lat": 26.1949504,
+          "lng": 127.6603734
         }
       ]
     }
