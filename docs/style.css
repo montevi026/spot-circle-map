@@ -99,6 +99,12 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 #publish-state.pending { color: #e65100; font-weight: bold; }
 #publish-link { display: inline-block; margin-top: 4px; }
 
+.chk.prox { font-weight: bold; }
+#prox-status { margin: 0 0 4px 24px; }
+#prox-status.err { color: #c62828; }
+#prox-banner { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3000; background: #2e7d32; color: #fff; padding: 10px 18px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.35); max-width: 90vw; cursor: pointer; font-size: 14px; }
+#prox-banner b { display: block; }
+
 #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 16px; border-radius: 6px; z-index: 3000; font-size: 13px; }
 #toast.err { background: #c62828; }
 

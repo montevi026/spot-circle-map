@@ -193,6 +193,7 @@ function refresh() {
 }
 
 function toggleCleared(spotId) {
+  insideSpots.delete(spotId); // 接近通知の「円の中にいる」記録もリセット
   if (cleared[spotId]) delete cleared[spotId];
   else cleared[spotId] = true;
   store(LS.cleared, cleared);
@@ -631,20 +632,163 @@ for (const [id, key] of [['opt-labels', 'labels'], ['opt-hide-cleared', 'hideCle
   $(id).addEventListener('change', (e) => { options[key] = e.target.checked; store(LS.options, options); renderMap(); });
 }
 
+// ---------- 現在地 ----------
 let locMarker = null;
+let accCircle = null;
+
+function showMyLocation(ll, accuracy) {
+  if (locMarker) {
+    locMarker.setLatLng(ll);
+    accCircle.setLatLng(ll).setRadius(accuracy);
+  } else {
+    accCircle = L.circle(ll, { radius: accuracy, color: '#1976d2', weight: 1, fillOpacity: 0.08, interactive: false }).addTo(map);
+    locMarker = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1976d2', fillOpacity: 1 }).addTo(map);
+  }
+}
+
 $('btn-locate').addEventListener('click', () => {
   if (!navigator.geolocation) { toast('このブラウザは位置情報に対応していません', true); return; }
   navigator.geolocation.getCurrentPosition(
     (p) => {
       const ll = [p.coords.latitude, p.coords.longitude];
-      if (locMarker) locMarker.setLatLng(ll);
-      else locMarker = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1976d2', fillOpacity: 1 }).addTo(map);
+      showMyLocation(ll, p.coords.accuracy);
       map.setView(ll, Math.max(map.getZoom(), 16));
     },
     (err) => toast('現在地を取得できませんでした: ' + err.message, true),
     { enableHighAccuracy: true, timeout: 10000 },
   );
 });
+
+// ---------- 接近通知 ----------
+// ON の間は現在地を監視し、表示中・未攻略のスポットの円に入ったら知らせる。
+// 一度知らせたスポットは、円から出る（半径 + 20m より離れる）まで再通知しない。
+const EXIT_MARGIN = 20;
+let watchId = null;
+let wakeLock = null;
+let audioCtx = null;
+const insideSpots = new Set();
+
+function setProxStatus(text, isErr = false) {
+  const s = $('prox-status');
+  s.textContent = text;
+  s.hidden = !text;
+  s.classList.toggle('err', isErr);
+}
+
+function beep() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  for (const [i, f] of [880, 1320].entries()) {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0.25, t + i * 0.18);
+    g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.18 + 0.15);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t + i * 0.18);
+    o.stop(t + i * 0.18 + 0.16);
+  }
+}
+
+async function notifyEnter(hits) {
+  const names = hits.map((h) => h.sp.name).join('、');
+  // 画面上のバナー（タップで閉じる）
+  const banner = $('prox-banner');
+  banner.replaceChildren(el('b', {}, '📍 サークルに入りました'), el('div', {}, names));
+  banner.hidden = false;
+  beep();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  // スマホの通知欄（許可されている場合）
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      const opts = { body: names, tag: 'spot-enter', renotify: true };
+      if (reg) await reg.showNotification('サークルに入りました', opts);
+      else new Notification('サークルに入りました', opts);
+    } catch { /* 通知できない環境では画面表示だけ */ }
+  }
+}
+
+function checkProximity(lat, lng) {
+  const here = L.latLng(lat, lng);
+  const hits = [];
+  const active = new Set();
+  for (const ev of data.events) {
+    if (!isVisible(ev)) continue;
+    for (const sp of ev.spots) {
+      if (isCleared(sp)) continue;
+      const d = here.distanceTo([sp.lat, sp.lng]);
+      if (d <= sp.radius) {
+        active.add(sp.id);
+        if (!insideSpots.has(sp.id)) { insideSpots.add(sp.id); hits.push({ ev, sp }); }
+      } else if (d <= sp.radius + EXIT_MARGIN && insideSpots.has(sp.id)) {
+        active.add(sp.id); // 境界付近でのぶれでは「出た」扱いにしない
+      }
+    }
+  }
+  for (const id of [...insideSpots]) if (!active.has(id)) insideSpots.delete(id);
+  if (hits.length) notifyEnter(hits);
+  return active.size;
+}
+
+async function requestWakeLock() {
+  // 画面が消えると位置の取得が止まるので、ON の間は画面を点けたままにする
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { wakeLock = null; }
+}
+
+function startProximity() {
+  if (!navigator.geolocation) {
+    setProxStatus('このブラウザは位置情報に対応していません', true);
+    return false;
+  }
+  setProxStatus('現在地を取得中…');
+  insideSpots.clear();
+  watchId = navigator.geolocation.watchPosition(
+    (p) => {
+      const { latitude: lat, longitude: lng, accuracy } = p.coords;
+      showMyLocation([lat, lng], accuracy);
+      const n = checkProximity(lat, lng);
+      const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setProxStatus(`監視中（精度 ±${Math.round(accuracy)}m・${time} 更新）${n ? `／${n} か所のサークル内` : ''}`);
+    },
+    (err) => setProxStatus('現在地を取得できません: ' + err.message, true),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 },
+  );
+  requestWakeLock();
+  return true;
+}
+
+function stopProximity() {
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  insideSpots.clear();
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+  setProxStatus('');
+}
+
+$('opt-proximity').addEventListener('change', async (e) => {
+  options.proximity = e.target.checked;
+  store(LS.options, options);
+  if (options.proximity) {
+    // 音とスマホ通知の許可は、スイッチを押した操作のタイミングでしか取れない
+    try { audioCtx ??= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch { /* 音なし */ }
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    startProximity();
+  } else {
+    stopProximity();
+  }
+});
+
+$('prox-banner').addEventListener('click', () => ($('prox-banner').hidden = true));
+
+document.addEventListener('visibilitychange', () => {
+  // 画面に戻ってきたら画面点灯の維持を取り直す（タブを離れると自動で解除されるため）
+  if (document.visibilityState === 'visible' && watchId != null) requestWakeLock();
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 // ---------- 起動 ----------
 async function init() {
@@ -676,5 +820,8 @@ async function init() {
   else map.setView([35.681236, 139.767125], 13); // 東京駅
 
   refresh();
+
+  $('opt-proximity').checked = !!options.proximity;
+  if (options.proximity) startProximity();
 }
 init();

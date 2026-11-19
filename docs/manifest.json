@@ -1,0 +1,9 @@
+{
+  "name": "スポットサークルマップ",
+  "short_name": "サークルマップ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1976d2"
+}
