@@ -311,10 +311,14 @@ let tempMarker = null;
 let tempCircle = null;
 
 function openSpotEditor(eventId, spotId = null) {
+  // 前回のプレビュー（マーカー・円）が残らないように消しておく
+  if (tempMarker) { tempMarker.remove(); tempMarker = null; }
+  if (tempCircle) { tempCircle.remove(); tempCircle = null; }
   const ev = findEvent(eventId);
   const sp = spotId ? ev.spots.find((s) => s.id === spotId) : null;
   spotEdit = { eventId, spotId, lat: sp?.lat ?? null, lng: sp?.lng ?? null };
   $('spot-panel-title').textContent = sp ? 'スポット編集' : 'スポット追加';
+  $('spot-save-next').hidden = !!sp; // 「続けて追加」は新規追加のときだけ
   $('spot-panel-event').textContent = ev.name;
   $('spot-name').value = sp ? sp.name : '';
   setRadiusUI(sp ? sp.radius : ev.defaultRadius);
@@ -609,9 +613,12 @@ $('spot-form').addEventListener('submit', async (e) => {
   }
   expanded[ev.id] = true;
   store(LS.expanded, expanded);
-  closeSpotEditor();
+  // 「続けて追加」なら同じイベントで入力欄を空にして開き直す（地図の位置はそのまま）
+  const next = e.submitter?.id === 'spot-save-next' && !spotEdit.spotId;
+  if (next) openSpotEditor(ev.id);
+  else closeSpotEditor();
   refresh();
-  await save();
+  if (await save() && next) toast(`「${name}」を保存しました。続けて次のスポットを入力できます`);
 });
 
 // ---------- その他 UI ----------
