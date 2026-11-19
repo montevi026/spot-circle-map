@@ -28,6 +28,105 @@
           "lng": 133.1176499
         }
       ]
+    },
+    {
+      "id": "emwnbkq2z9y2f",
+      "name": "駅メモ上高地線2026",
+      "defaultRadius": 200,
+      "color": "#fa0000",
+      "spots": [
+        {
+          "id": "smwnblcksbfkq",
+          "name": "松本市歴史の里",
+          "radius": 200,
+          "lat": 36.2315085,
+          "lng": 137.9338085
+        },
+        {
+          "id": "smwnbo8ih2cr8",
+          "name": "亀田屋酒造店",
+          "radius": 200,
+          "lat": 36.224415,
+          "lng": 137.92514
+        },
+        {
+          "id": "smwnbppm1530v",
+          "name": "ものぐさ太郎伝承地",
+          "radius": 200,
+          "lat": 36.2172238,
+          "lng": 137.9124264
+        },
+        {
+          "id": "smwnbrsw11inh",
+          "name": "松本城",
+          "radius": 200,
+          "lat": 36.2386353,
+          "lng": 137.9688709
+        },
+        {
+          "id": "smwnbsv0xhx1e",
+          "name": "渚駅",
+          "radius": 50,
+          "lat": 36.227026,
+          "lng": 137.9562068
+        },
+        {
+          "id": "smwnbupoifaca",
+          "name": "大庭駅",
+          "radius": 50,
+          "lat": 36.2270002,
+          "lng": 137.9416108
+        },
+        {
+          "id": "smwncjwi4vy3c",
+          "name": "下新駅",
+          "radius": 50,
+          "lat": 36.2249979,
+          "lng": 137.922616
+        },
+        {
+          "id": "smwnck9ngr7mz",
+          "name": "北新・松本大学前駅",
+          "radius": 50,
+          "lat": 36.2193297,
+          "lng": 137.9135228
+        },
+        {
+          "id": "smwnckoujvd9p",
+          "name": "森口駅",
+          "radius": 50,
+          "lat": 36.2080829,
+          "lng": 137.8813536
+        },
+        {
+          "id": "smwnckz4idux2",
+          "name": "新村駅",
+          "radius": 50,
+          "lat": 36.2165326,
+          "lng": 137.9053487
+        },
+        {
+          "id": "smwnclamawm5d",
+          "name": "波田駅",
+          "radius": 50,
+          "lat": 36.2003004,
+          "lng": 137.8567941
+        },
+        {
+          "id": "smwnclodhxgf1",
+          "name": "渕東駅",
+          "radius": 50,
+          "lat": 36.1953022,
+          "lng": 137.8403467
+        },
+        {
+          "id": "smwnclyyqe0r0",
+          "name": "新島々駅",
+          "radius": 50,
+          "lat": 36.1897199,
+          "lng": 137.8218388
+        }
+      ]
     }
   ]
 }
