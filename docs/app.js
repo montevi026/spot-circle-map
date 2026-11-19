@@ -210,29 +210,68 @@ function startEventDrag(e) {
   const scroller = $('sidebar');
   const before = [...list.children].map((c) => c.dataset.id).join();
   try { handle.setPointerCapture(e.pointerId); } catch { /* 合成イベントなど */ }
+
+  // つかんだ位置（カード上端からの距離）を覚えておき、カードがポインターに付いてくるようにする
+  const grabOffset = e.clientY - card.getBoundingClientRect().top;
+  let shift = 0; // ドラッグ中のカードに掛けている translateY
+  card.style.transition = 'box-shadow .15s, transform .15s';
   card.classList.add('dragging');
   document.body.classList.add('dragging-event');
 
+  const follow = (clientY) => {
+    // 本来の（transform なしの）位置との差を translate で埋める。リストの外には出さない
+    const layoutTop = card.getBoundingClientRect().top - shift;
+    const lr = list.getBoundingClientRect();
+    const target = Math.min(Math.max(clientY - grabOffset, lr.top - 4), lr.bottom - card.offsetHeight + 4);
+    shift = target - layoutTop;
+    card.style.transition = 'box-shadow .15s';
+    card.style.transform = `translateY(${shift}px) scale(1.02)`;
+  };
+
+  // 他のカードを入れ替えるとき、元の位置から新しい位置へスライドさせる（FLIP アニメーション）
+  const moveWithAnimation = (doMove) => {
+    const others = [...list.children].filter((c) => c !== card);
+    // 見た目の位置（スライド途中ならその途中の位置）を記録してから並べ替える
+    const first = new Map(others.map((c) => [c, c.getBoundingClientRect().top]));
+    doMove();
+    for (const c of others) {
+      c.style.transition = 'none';
+      c.style.transform = '';
+      const dy = first.get(c) - c.getBoundingClientRect().top;
+      if (!dy) continue;
+      c.style.transform = `translateY(${dy}px)`;
+      c.getBoundingClientRect(); // ここで一度描画位置を確定させてから、アニメーションで元に戻す
+      c.style.transition = 'transform .2s ease';
+      c.style.transform = '';
+    }
+  };
+
   const onMove = (ev) => {
-    // ポインターの位置より下にある最初のカードの手前へ移動
-    const others = [...list.querySelectorAll('.event-card:not(.dragging)')];
-    const next = others.find((c) => {
-      const r = c.getBoundingClientRect();
-      return ev.clientY < r.top + r.height / 2;
-    });
-    if (next) { if (card.nextElementSibling !== next) list.insertBefore(card, next); }
-    else if (list.lastElementChild !== card) list.append(card);
+    // ドラッグ中のカードの中心が、他のカードの中心を越えたら入れ替える。
+    // スライド中のカードの見た目に左右されないよう、判定は本来の配置（offsetTop）で行う
+    const center = ev.clientY - grabOffset - list.getBoundingClientRect().top + card.offsetHeight / 2;
+    const others = [...list.children].filter((c) => c !== card);
+    const next = others.find((c) => center < c.offsetTop + c.offsetHeight / 2);
+    if (next ? card.nextElementSibling !== next : list.lastElementChild !== card) {
+      moveWithAnimation(() => (next ? list.insertBefore(card, next) : list.append(card)));
+    }
+    follow(ev.clientY);
     // サイドバーの上端・下端に近づいたら自動スクロール
     const sr = scroller.getBoundingClientRect();
     if (ev.clientY < sr.top + 40) scroller.scrollTop -= 12;
     else if (ev.clientY > sr.bottom - 40) scroller.scrollTop += 12;
   };
+
   const onEnd = () => {
     handle.removeEventListener('pointermove', onMove);
     handle.removeEventListener('pointerup', onEnd);
     handle.removeEventListener('pointercancel', onEnd);
-    card.classList.remove('dragging');
     document.body.classList.remove('dragging-event');
+    // 定位置へなめらかに戻す
+    card.style.transition = 'transform .2s ease, box-shadow .2s';
+    card.style.transform = '';
+    card.classList.remove('dragging');
+    card.addEventListener('transitionend', () => { card.style.transition = ''; }, { once: true });
     const ids = [...list.children].map((c) => c.dataset.id).filter(Boolean);
     if (ids.join() !== before) {
       eventOrder = ids;
