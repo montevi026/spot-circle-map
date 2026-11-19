@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>スポットサークルマップ</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <header class="sb-head">
+      <h1>スポットサークルマップ</h1>
+      <span id="mode-badge" class="badge">閲覧モード</span>
+      <button id="sb-close" class="icon-btn only-mobile" title="閉じる">✕</button>
+    </header>
+
+    <section id="publish-box" class="sb-section edit-only">
+      <div class="row-between">
+        <span id="publish-state" class="small muted">公開状態を確認中…</span>
+        <button id="btn-publish" class="btn primary">公開サイトへアップロード</button>
+      </div>
+      <a id="publish-link" class="small" target="_blank" rel="noopener" hidden>公開サイトを開く ↗</a>
+    </section>
+
+    <section class="sb-section">
+      <label class="chk"><input type="checkbox" id="opt-labels"> スポット名を常に表示</label>
+      <label class="chk"><input type="checkbox" id="opt-hide-cleared"> 攻略済スポットを地図に表示しない</label>
+    </section>
+
+    <section class="sb-section">
+      <div class="row-between">
+        <h2>イベント</h2>
+        <button id="btn-add-event" class="btn primary edit-only">＋ イベント追加</button>
+      </div>
+      <div id="event-list"></div>
+      <p id="empty-msg" class="muted" hidden>イベントがまだ登録されていません。</p>
+    </section>
+  </aside>
+
+  <main id="map-wrap">
+    <div id="map"></div>
+    <button id="sb-open" class="map-btn only-mobile" title="メニュー">☰</button>
+    <button id="btn-locate" class="map-btn" title="現在地">◎</button>
+
+    <!-- スポット登録／編集パネル（編集モードのみ） -->
+    <div id="spot-panel" class="float-panel" hidden>
+      <div class="row-between">
+        <h3 id="spot-panel-title">スポット追加</h3>
+        <button id="spot-cancel-x" class="icon-btn" title="閉じる">✕</button>
+      </div>
+      <p class="muted small">イベント: <span id="spot-panel-event"></span></p>
+      <form id="search-form" class="search-row">
+        <input type="search" id="search-q" placeholder="名称で検索（例: 東京駅）">
+        <button type="submit" class="btn">検索</button>
+      </form>
+      <ul id="search-results"></ul>
+      <p class="muted small">検索結果を選ぶか、地図をクリックして場所を指定（マーカーはドラッグで微調整可）</p>
+      <form id="spot-form">
+        <label>名称<input type="text" id="spot-name" required></label>
+        <label>半径 (m)<input type="number" id="spot-radius" min="1" step="1" required></label>
+        <p class="small">座標: <span id="spot-coord">未指定</span></p>
+        <div class="row-end">
+          <button type="button" id="spot-cancel" class="btn">キャンセル</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- イベント登録／編集ダイアログ -->
+  <dialog id="event-dialog">
+    <form id="event-form" method="dialog">
+      <h3 id="event-dialog-title">イベント追加</h3>
+      <label>イベント名<input type="text" id="event-name" required></label>
+      <label>デフォルトのスポット半径 (m)<input type="number" id="event-radius" min="1" step="1" value="200" required></label>
+      <label>表示色<input type="color" id="event-color" value="#e6194b"></label>
+      <div class="row-end">
+        <button type="button" id="event-cancel" class="btn">キャンセル</button>
+        <button type="submit" class="btn primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>

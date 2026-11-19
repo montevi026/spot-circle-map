@@ -1,0 +1,33 @@
+{
+  "events": [
+    {
+      "id": "emwn8xkw03e9i",
+      "name": "駅メモ芸備線2026",
+      "defaultRadius": 200,
+      "color": "#e24069",
+      "spots": [
+        {
+          "id": "smwn9093qwew9",
+          "name": "里山の駅 庄原ふらり",
+          "radius": 200,
+          "lat": 34.839934,
+          "lng": 132.9967707
+        },
+        {
+          "id": "smwn91dojs7ob",
+          "name": "ドライブインおちあい",
+          "radius": 200,
+          "lat": 34.9994177,
+          "lng": 133.1385255
+        },
+        {
+          "id": "smwn938jenr1r",
+          "name": "ウイル西城",
+          "radius": 200,
+          "lat": 34.9395208,
+          "lng": 133.1176499
+        }
+      ]
+    }
+  ]
+}
