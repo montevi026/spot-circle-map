@@ -52,10 +52,18 @@
       </div>
       <p class="muted small">イベント: <span id="spot-panel-event"></span></p>
       <form id="search-form" class="search-row">
-        <input type="search" id="search-q" placeholder="名称で検索（例: 東京駅）">
+        <input type="search" id="search-q" placeholder="名称 / 座標 / Google マップのURL">
         <button type="submit" class="btn">検索</button>
       </form>
       <ul id="search-results"></ul>
+      <details class="small help">
+        <summary>名称で見つからないときは</summary>
+        <ul>
+          <li>Google マップで地点を右クリック → 一番上の座標（例: 34.9395, 133.1176）をクリックするとコピーされるので、それを貼り付けて「検索」</li>
+          <li>Google マップの「共有」→「リンクをコピー」の URL を貼り付けて「検索」</li>
+          <li>「道の駅」「駅」などを省いたり、ひらがな/カタカナを変えたりして検索</li>
+        </ul>
+      </details>
       <p class="muted small">検索結果を選ぶか、地図をクリックして場所を指定（マーカーはドラッグで微調整可）</p>
       <form id="spot-form">
         <label>名称<input type="text" id="spot-name" required></label>

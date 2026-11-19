@@ -371,41 +371,144 @@ $('spot-radius').addEventListener('input', updateTemp);
 $('spot-cancel').addEventListener('click', closeSpotEditor);
 $('spot-cancel-x').addEventListener('click', closeSpotEditor);
 
-// 名称検索（OpenStreetMap Nominatim）
+// ---------- 場所の検索 ----------
+// 入力は次のどれでも可:
+//   ・座標「34.9395, 133.1176」（Google マップで地点を右クリック → 座標をクリックでコピー）
+//   ・Google マップの URL / 共有リンク（maps.app.goo.gl はローカルサーバーで展開）
+//   ・名称（Nominatim / Photon / 国土地理院 を同時に検索して結果をまとめる）
+
+function parseCoords(text) {
+  const m = text.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*[,，\s]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+}
+
+function parseGoogleMapsUrl(url) {
+  let name = null;
+  const pm = url.match(/\/maps\/place\/([^/@?]+)/);
+  if (pm) { try { name = decodeURIComponent(pm[1].replace(/\+/g, ' ')); } catch { /* ignore */ } }
+  // !3d<lat>!4d<lng> が地点そのもの。無ければ @lat,lng（表示中心）や q=lat,lng を使う
+  const m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)
+    || url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+    || url.match(/[?&](?:q|query|ll|center|destination)=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)/i);
+  return m ? { lat: Number(m[1]), lng: Number(m[2]), name } : null;
+}
+
+async function resolveShortUrl(url) {
+  const res = await fetch('api/resolve-url', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || res.statusText);
+  return j.url;
+}
+
+async function searchNominatim(q) {
+  const b = map.getBounds();
+  const params = new URLSearchParams({
+    q, format: 'jsonv2', limit: '10', 'accept-language': 'ja',
+    viewbox: [b.getWest(), b.getNorth(), b.getEast(), b.getSouth()].join(','),
+  });
+  const res = await fetch('https://nominatim.openstreetmap.org/search?' + params);
+  if (!res.ok) throw new Error('Nominatim ' + res.status);
+  return (await res.json()).map((r) => ({
+    src: 'OSM', lat: Number(r.lat), lng: Number(r.lon),
+    name: r.name || r.display_name.split(',')[0], detail: r.display_name,
+  }));
+}
+
+async function searchPhoton(q) {
+  const c = map.getCenter();
+  const params = new URLSearchParams({ q, limit: '10', lat: c.lat, lon: c.lng });
+  const res = await fetch('https://photon.komoot.io/api/?' + params);
+  if (!res.ok) throw new Error('Photon ' + res.status);
+  return (await res.json()).features.map((f) => {
+    const p = f.properties;
+    return {
+      src: 'Photon', lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0],
+      name: p.name || p.street || '(名称なし)',
+      detail: [p.state, p.county, p.city, p.district, p.street, p.housenumber].filter(Boolean).join(' '),
+    };
+  });
+}
+
+async function searchGsi(q) {
+  const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(q));
+  if (!res.ok) throw new Error('国土地理院 ' + res.status);
+  return (await res.json()).map((r) => ({
+    src: '地理院', lat: r.geometry.coordinates[1], lng: r.geometry.coordinates[0],
+    name: r.properties.title, detail: r.properties.title,
+  }));
+}
+
+function showResults(results, emptyMsg) {
+  const ul = $('search-results');
+  ul.replaceChildren();
+  if (!results.length) { ul.append(el('li', { class: 'muted' }, emptyMsg)); return; }
+  for (const r of results) {
+    const li = el('li', {
+      onclick: () => {
+        ul.querySelectorAll('li').forEach((x) => x.classList.remove('sel'));
+        li.classList.add('sel');
+        $('spot-name').value = r.name;
+        setSpotLocation(r.lat, r.lng);
+        map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16));
+      },
+    }, el('b', {}, r.name, el('span', { class: 'src' }, r.src)), r.detail);
+    ul.append(li);
+  }
+}
+
+function placeDirect(lat, lng, name) {
+  $('search-results').replaceChildren(el('li', { class: 'muted' }, '指定した座標に配置しました'));
+  if (name) $('spot-name').value = name;
+  setSpotLocation(lat, lng);
+  map.setView([lat, lng], Math.max(map.getZoom(), 16));
+}
+
 $('search-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const q = $('search-q').value.trim();
   if (!q) return;
   const ul = $('search-results');
-  ul.replaceChildren(el('li', { class: 'muted' }, '検索中…'));
-  const b = map.getBounds();
-  const params = new URLSearchParams({
-    q, format: 'jsonv2', limit: '15', 'accept-language': 'ja',
-    viewbox: [b.getWest(), b.getNorth(), b.getEast(), b.getSouth()].join(','),
-  });
-  try {
-    const res = await fetch('https://nominatim.openstreetmap.org/search?' + params);
-    if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-    const results = await res.json();
-    ul.replaceChildren();
-    if (!results.length) { ul.append(el('li', { class: 'muted' }, '見つかりませんでした')); return; }
-    for (const r of results) {
-      const lat = Number(r.lat), lng = Number(r.lon);
-      const short = r.name || r.display_name.split(',')[0];
-      const li = el('li', {
-        onclick: () => {
-          ul.querySelectorAll('li').forEach((x) => x.classList.remove('sel'));
-          li.classList.add('sel');
-          $('spot-name').value = short;
-          setSpotLocation(lat, lng);
-          map.setView([lat, lng], Math.max(map.getZoom(), 16));
-        },
-      }, el('b', {}, short), r.display_name);
-      ul.append(li);
+
+  // 座標
+  const c = parseCoords(q);
+  if (c) { placeDirect(c.lat, c.lng); return; }
+
+  // Google マップの URL
+  if (/^https?:\/\//i.test(q)) {
+    ul.replaceChildren(el('li', { class: 'muted' }, 'URL を解析中…'));
+    try {
+      let url = q;
+      if (!parseGoogleMapsUrl(url) && /(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)/i.test(url)) {
+        url = await resolveShortUrl(url);
+      }
+      const g = parseGoogleMapsUrl(url);
+      if (!g) throw new Error('この URL から座標を読み取れませんでした');
+      placeDirect(g.lat, g.lng, g.name);
+    } catch (err) {
+      ul.replaceChildren(el('li', { class: 'muted' }, err.message));
     }
-  } catch (err) {
-    ul.replaceChildren(el('li', { class: 'muted' }, '検索に失敗しました: ' + err.message));
+    return;
   }
+
+  // 名称検索（3 サービスを並列に）
+  ul.replaceChildren(el('li', { class: 'muted' }, '検索中…'));
+  const settled = await Promise.allSettled([searchGsi(q), searchNominatim(q), searchPhoton(q)]);
+  const merged = [];
+  for (const s of settled) {
+    if (s.status !== 'fulfilled') continue;
+    for (const r of s.value) {
+      // 同名で 50m 以内のものは重複として除外
+      const dup = merged.some((m) => m.name === r.name && map.distance([m.lat, m.lng], [r.lat, r.lng]) < 50);
+      if (!dup) merged.push(r);
+    }
+  }
+  const failed = settled.filter((s) => s.status === 'rejected').map((s) => s.reason.message);
+  showResults(merged, '見つかりませんでした。Google マップで地点を右クリック → 座標をコピーして貼り付けるか、地図をクリックして指定してください');
+  if (failed.length) ul.append(el('li', { class: 'muted' }, '一部の検索に失敗: ' + failed.join(', ')));
 });
 
 $('spot-form').addEventListener('submit', async (e) => {

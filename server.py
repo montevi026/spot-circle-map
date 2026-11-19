@@ -16,6 +16,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 import webbrowser
 from datetime import datetime
 
@@ -106,6 +109,36 @@ def publish():
         PUBLISH_LOCK.release()
 
 
+# ---------- Google マップ短縮リンクの展開 ----------
+SHORT_HOSTS = {"maps.app.goo.gl", "goo.gl", "g.co"}
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def resolve_short_url(url):
+    """短縮リンクのリダイレクトを辿り、Google 側の最終 URL を返す（本文は取得しない）"""
+    opener = urllib.request.build_opener(_NoRedirect)
+    for _ in range(5):
+        u = urllib.parse.urlsplit(url)
+        if u.scheme not in ("http", "https") or u.hostname not in SHORT_HOSTS:
+            return url
+        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            opener.open(req, timeout=10)
+            return url  # リダイレクトしなかった
+        except urllib.error.HTTPError as e:
+            loc = e.headers.get("Location")
+            if e.code not in (301, 302, 303, 307, 308) or not loc:
+                raise ValueError(f"短縮リンクを展開できませんでした (HTTP {e.code})")
+            url = urllib.parse.urljoin(url, loc)
+        except (urllib.error.URLError, TimeoutError) as e:
+            raise ValueError(f"短縮リンクを展開できませんでした: {e}")
+    return url
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     # Windows のレジストリ次第で .js が text/plain になるのを防ぐ
     extensions_map = {
@@ -154,10 +187,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/publish":
+        if self.path not in ("/api/publish", "/api/resolve-url"):
             return self._json(404, {"error": "not found"})
         if not (self._host_ok() and self._origin_ok()):
             return self._json(403, {"error": "forbidden"})
+        if self.path == "/api/resolve-url":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                url = json.loads(self.rfile.read(length).decode("utf-8")).get("url", "")
+                if urllib.parse.urlsplit(url).hostname not in SHORT_HOSTS:
+                    raise ValueError("対応していない短縮リンクです")
+                return self._json(200, {"url": resolve_short_url(url)})
+            except (ValueError, AttributeError) as ex:
+                return self._json(400, {"error": str(ex)})
         try:
             self._json(200, publish())
         except PublishError as ex:
