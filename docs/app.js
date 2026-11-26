@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VERSION = '2026-11-26b'; // 更新したら変える（スマホで新しい版が動いているか確認用）
+
 // ---------- ブラウザ保存（localStorage） ----------
 const LS = {
   visibility: 'scm.visibility.v1', // { eventId: false } 非表示にしたイベント
@@ -74,10 +76,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // スワイプせずに離したら、通常のダブルタップとして 1 段階拡大する。
 (function setupOneFingerZoom() {
   const box = map.getContainer();
-  const TAP_MAX_MS = 300;     // 1 回目のタップとみなす最大の押下時間
-  const DOUBLE_MS = 300;      // 1 回目と 2 回目のタップの最大間隔
-  const NEAR_PX = 40;         // 2 回目のタップが 1 回目からこの距離以内ならダブルタップ
-  const MOVE_PX = 10;         // これ以上動いたらタップではなくスワイプ
+  const TAP_MAX_MS = 400;     // 1 回目のタップとみなす最大の押下時間
+  const DOUBLE_MS = 450;      // 1 回目と 2 回目のタップの最大間隔
+  const NEAR_PX = 60;         // 2 回目のタップが 1 回目からこの距離以内ならダブルタップ
+  const MOVE_PX = 15;         // これ以上動いたらタップではなくスワイプ
   const PX_PER_ZOOM = 120;    // 何 px 動かすとズーム 1 段階か
 
   let down = null;            // 1 回目のタッチ開始 { t, x, y }
@@ -1024,6 +1026,7 @@ async function init() {
   refresh();
 
   updateInstallBox();
+  $('app-version').textContent = 'ver. ' + APP_VERSION;
   $('opt-proximity').checked = !!options.proximity;
   if (options.proximity) startProximity();
 }
