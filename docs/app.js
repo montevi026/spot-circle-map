@@ -69,6 +69,75 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 }).addTo(map);
 
+// ---------- ダブルタップ＋スワイプで拡大・縮小（スマホ） ----------
+// Google マップと同じ操作: 2 回目のタップで指を離さずに下へ動かすと拡大、上へ動かすと縮小。
+// スワイプせずに離したら、通常のダブルタップとして 1 段階拡大する。
+(function setupOneFingerZoom() {
+  const box = map.getContainer();
+  const TAP_MAX_MS = 300;     // 1 回目のタップとみなす最大の押下時間
+  const DOUBLE_MS = 300;      // 1 回目と 2 回目のタップの最大間隔
+  const NEAR_PX = 40;         // 2 回目のタップが 1 回目からこの距離以内ならダブルタップ
+  const MOVE_PX = 10;         // これ以上動いたらタップではなくスワイプ
+  const PX_PER_ZOOM = 120;    // 何 px 動かすとズーム 1 段階か
+
+  let down = null;            // 1 回目のタッチ開始 { t, x, y }
+  let lastTap = null;         // 直前のタップ { t, x, y }
+  let zoomG = null;           // ズーム操作中 { y0, z0, pt, moved }
+
+  const pos = (t) => { const r = box.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; };
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+  box.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { down = lastTap = null; if (zoomG) endZoom(); return; }
+    const p = pos(e.touches[0]);
+    const now = Date.now();
+    if (lastTap && now - lastTap.t < DOUBLE_MS && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < NEAR_PX) {
+      // 2 回目のタップ: Leaflet にはこのタッチを渡さず（地図のドラッグを止める）自前でズームする
+      stop(e);
+      zoomG = { y0: p.y, z0: map.getZoom(), pt: L.point(lastTap.x, lastTap.y), moved: false };
+      lastTap = null;
+      map.options.zoomSnap = 0; // スワイプ中は段階に区切らず滑らかに
+      return;
+    }
+    down = { t: now, ...p };
+  }, { capture: true, passive: false });
+
+  box.addEventListener('touchmove', (e) => {
+    if (!zoomG) {
+      if (down && e.touches.length === 1) {
+        const p = pos(e.touches[0]);
+        if (Math.hypot(p.x - down.x, p.y - down.y) > MOVE_PX) down = null; // ドラッグなのでタップではない
+      }
+      return;
+    }
+    stop(e);
+    const y = pos(e.touches[0]).y;
+    if (Math.abs(y - zoomG.y0) > MOVE_PX) zoomG.moved = true;
+    if (!zoomG.moved) return;
+    const z = Math.min(Math.max(zoomG.z0 + (y - zoomG.y0) / PX_PER_ZOOM, map.getMinZoom()), map.getMaxZoom());
+    map.setZoomAround(zoomG.pt, z, { animate: false });
+  }, { capture: true, passive: false });
+
+  function endZoom(e) {
+    const g = zoomG;
+    zoomG = null;
+    map.options.zoomSnap = 1;
+    if (e) stop(e);
+    // スワイプしなかった＝ただのダブルタップ → 1 段階拡大
+    if (g && !g.moved) map.setZoomAround(g.pt, Math.min(Math.round(g.z0) + 1, map.getMaxZoom()));
+  }
+
+  box.addEventListener('touchend', (e) => {
+    if (zoomG) { endZoom(e); return; }
+    if (down && e.touches.length === 0 && Date.now() - down.t < TAP_MAX_MS) {
+      lastTap = { t: Date.now(), x: down.x, y: down.y };
+    }
+    down = null;
+  }, { capture: true, passive: false });
+
+  box.addEventListener('touchcancel', () => { down = lastTap = null; if (zoomG) endZoom(); }, { capture: true });
+}());
+
 const spotsLayer = L.layerGroup().addTo(map);
 const spotLayers = new Map(); // spotId -> { circle, dot, eventId }
 
