@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '2026-11-26b'; // 更新したら変える（スマホで新しい版が動いているか確認用）
+const APP_VERSION = '2026-11-26c'; // 更新したら変える（スマホで新しい版が動いているか確認用）
 
 // ---------- ブラウザ保存（localStorage） ----------
 const LS = {
@@ -96,9 +96,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     if (lastTap && now - lastTap.t < DOUBLE_MS && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < NEAR_PX) {
       // 2 回目のタップ: Leaflet にはこのタッチを渡さず（地図のドラッグを止める）自前でズームする
       stop(e);
-      zoomG = { y0: p.y, z0: map.getZoom(), pt: L.point(lastTap.x, lastTap.y), moved: false };
+      const pt = L.point(lastTap.x, lastTap.y);
+      // anchor: ダブルタップした地点の緯度経度。ズーム中もこの地点が指の下に留まるようにする
+      zoomG = { y0: p.y, z0: map.getZoom(), z: map.getZoom(), pt, anchor: map.containerPointToLatLng(pt), moved: false };
       lastTap = null;
-      map.options.zoomSnap = 0; // スワイプ中は段階に区切らず滑らかに
       return;
     }
     down = { t: now, ...p };
@@ -114,19 +115,38 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     }
     stop(e);
     const y = pos(e.touches[0]).y;
-    if (Math.abs(y - zoomG.y0) > MOVE_PX) zoomG.moved = true;
-    if (!zoomG.moved) return;
-    const z = Math.min(Math.max(zoomG.z0 + (y - zoomG.y0) / PX_PER_ZOOM, map.getMinZoom()), map.getMaxZoom());
-    map.setZoomAround(zoomG.pt, z, { animate: false });
+    if (!zoomG.moved) {
+      if (Math.abs(y - zoomG.y0) <= MOVE_PX) return;
+      zoomG.moved = true;
+      // ピンチ操作と同じ方式で開始する（今のタイルを拡大縮小して見せ、読み込み直しは指を離した後）
+      map._stop();
+      map._moveStart(true, false);
+    }
+    zoomG.z = Math.min(Math.max(zoomG.z0 + (y - zoomG.y0) / PX_PER_ZOOM, map.getMinZoom()), map.getMaxZoom());
+    map._move(centerFor(zoomG, zoomG.z), zoomG.z, { pinch: true, round: false });
   }, { capture: true, passive: false });
+
+  // ズーム z のとき、anchor が画面上の pt の位置に来るような地図の中心
+  function centerFor(g, z) {
+    const offset = g.pt.subtract(map.getSize().divideBy(2));
+    return map.unproject(map.project(g.anchor, z).subtract(offset), z);
+  }
 
   function endZoom(e) {
     const g = zoomG;
     zoomG = null;
-    map.options.zoomSnap = 1;
     if (e) stop(e);
-    // スワイプしなかった＝ただのダブルタップ → 1 段階拡大
-    if (g && !g.moved) map.setZoomAround(g.pt, Math.min(Math.round(g.z0) + 1, map.getMaxZoom()));
+    if (!g) return;
+    if (!g.moved) {
+      // スワイプしなかった＝ただのダブルタップ → 1 段階拡大
+      map.setZoomAround(g.pt, Math.min(Math.round(g.z0) + 1, map.getMaxZoom()));
+      return;
+    }
+    // 指を離したら整数のズームに合わせて確定し、その倍率のタイルを読み込む（ピンチ操作の終了処理と同じ）
+    const z = map._limitZoom(g.z);
+    const c = centerFor(g, z);
+    if (map._zoomAnimated) map._animateZoom(c, z, true, map.options.zoomSnap);
+    else map._resetView(c, z);
   }
 
   box.addEventListener('touchend', (e) => {
